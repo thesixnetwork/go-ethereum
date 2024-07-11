@@ -2126,7 +2126,7 @@ func testInsertKnownChainData(t *testing.T, typ string) {
 			}
 		}
 	} else {
-		inserter = func(blocks []*types.Block, receipts []types.Receipts) error {
+		inserter = func(blocks []*types.Block, _ []types.Receipts) error {
 			_, err := chain.InsertChain(blocks)
 			return err
 		}
