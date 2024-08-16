@@ -495,6 +495,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 			evm.Config.Tracer.CaptureExit(ret, gas-contract.Gas, err)
 		}
 	}
+
+  fmt.Println("####################################### CRETEA COMPLETE ##########################")
 	return ret, address, contract.Gas, err
 }
 
