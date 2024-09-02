@@ -19,6 +19,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -491,40 +492,59 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 
 // handleCall processes method calls.
 func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
-	if msg.isSubscribe() {
-		return h.handleSubscribe(cp, msg)
-	}
-	var callb *callback
-	if msg.isUnsubscribe() {
-		callb = h.unsubscribeCb
-	} else {
-		callb = h.reg.callback(msg.Method)
-	}
-	if callb == nil {
-		return msg.errorResponse(&methodNotFoundError{method: msg.Method})
-	}
+    // Log the incoming message details
+    fmt.Println("##################### handleCall Input #####################")
+    fmt.Printf("Method: %s\n", msg.Method)
+    fmt.Printf("ID: %v\n", msg.ID)
+    fmt.Printf("Params: %v\n", msg.Params)
+    fmt.Println("##########################################################")
 
-	args, err := parsePositionalArguments(msg.Params, callb.argTypes)
-	if err != nil {
-		return msg.errorResponse(&invalidParamsError{err.Error()})
-	}
-	start := time.Now()
-	answer := h.runMethod(cp.ctx, msg, callb, args)
+    if msg.isSubscribe() {
+        return h.handleSubscribe(cp, msg)
+    }
+    var callb *callback
+    if msg.isUnsubscribe() {
+        callb = h.unsubscribeCb
+    } else {
+        callb = h.reg.callback(msg.Method)
+    }
+    if callb == nil {
+        return msg.errorResponse(&methodNotFoundError{method: msg.Method})
+    }
 
-	// Collect the statistics for RPC calls if metrics is enabled.
-	// We only care about pure rpc call. Filter out subscription.
-	if callb != h.unsubscribeCb {
-		rpcRequestGauge.Inc(1)
-		if answer.Error != nil {
-			failedRequestGauge.Inc(1)
-		} else {
-			successfulRequestGauge.Inc(1)
-		}
-		rpcServingTimer.UpdateSince(start)
-		updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
-	}
+    args, err := parsePositionalArguments(msg.Params, callb.argTypes)
+    if err != nil {
+        return msg.errorResponse(&invalidParamsError{err.Error()})
+    }
 
-	return answer
+    // Log the parsed arguments
+    fmt.Println("##################### Parsed Arguments ####################")
+    fmt.Printf("Args: %v\n", args)
+    fmt.Println("##########################################################")
+
+    start := time.Now()
+    answer := h.runMethod(cp.ctx, msg, callb, args)
+
+    // Collect the statistics for RPC calls if metrics is enabled.
+    // We only care about pure rpc call. Filter out subscription.
+    if callb != h.unsubscribeCb {
+        rpcRequestGauge.Inc(1)
+        if answer.Error != nil {
+            failedRequestGauge.Inc(1)
+        } else {
+            successfulRequestGauge.Inc(1)
+        }
+        rpcServingTimer.UpdateSince(start)
+        updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
+    }
+
+    // Log the response
+    fmt.Println("##################### handleCall Response #################")
+    fmt.Printf("Error: %v\n", answer.Error)
+    fmt.Printf("Result: %v\n", answer.Result)
+    fmt.Println("##########################################################")
+
+    return answer
 }
 
 // handleSubscribe processes *_subscribe method calls.
