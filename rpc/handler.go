@@ -499,8 +499,6 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
         }
     }
 
-	// logJSONRPCMessage(msg)
-
 	if msg.isSubscribe() {
 		return h.handleSubscribe(cp, msg)
 	}
