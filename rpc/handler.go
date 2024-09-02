@@ -671,60 +671,46 @@ func logJSONRPCMessage(msg *jsonrpcMessage) {
 }
 
 func handleEthFeeHistoryParams(msg *jsonrpcMessage) error {
-    var rawParams []json.RawMessage
-    if err := json.Unmarshal(msg.Params, &rawParams); err != nil {
+    var params []json.RawMessage
+    if err := json.Unmarshal(msg.Params, &params); err != nil {
         return fmt.Errorf("invalid params: %v", err)
     }
 
-    if len(rawParams) < 2 {
+    if len(params) < 2 {
         return fmt.Errorf("insufficient parameters")
     }
 
-    // Parse and validate parameters
-    blockCount, err := parseBlockCount(rawParams[0])
+    // Handle blockCount (first parameter)
+    blockCount, err := parseBlockCount(params[0])
     if err != nil {
         return err
     }
 
-    newestBlock, err := parseNewestBlock(rawParams[1])
+    // Replace the first parameter with the parsed uint64 value
+    params[0], err = json.Marshal(blockCount)
     if err != nil {
-        return err
+        return fmt.Errorf("error marshaling blockCount: %v", err)
     }
 
-    rewardPercentiles, err := parseRewardPercentiles(rawParams)
-    if err != nil {
-        return err
-    }
-
-    // Create a new Params structure with the parsed values
-    newParams := struct {
-        BlockCount        uint64    `json:"blockCount"`
-        NewestBlock       string    `json:"newestBlock"`
-        RewardPercentiles []float64 `json:"rewardPercentiles,omitempty"`
-    }{
-        BlockCount:        blockCount,
-        NewestBlock:       newestBlock,
-        RewardPercentiles: rewardPercentiles,
-    }
-
-    // Marshal the new params back into the message
-    newParamsJSON, err := json.Marshal(newParams)
+    // Marshal the modified params back into the message
+    newParams, err := json.Marshal(params)
     if err != nil {
         return fmt.Errorf("error marshaling new params: %v", err)
     }
 
-    msg.Params = json.RawMessage(newParamsJSON)
+    msg.Params = newParams
     return nil
 }
 
 func parseBlockCount(param json.RawMessage) (uint64, error) {
     var blockCount uint64
     if err := json.Unmarshal(param, &blockCount); err != nil {
-        // Try parsing as string
+        // If unmarshaling to uint64 fails, try parsing as string
         var blockCountStr string
         if err := json.Unmarshal(param, &blockCountStr); err != nil {
             return 0, fmt.Errorf("invalid blockCount: %v", err)
         }
+        // Remove '0x' prefix if present
         blockCountStr = strings.TrimPrefix(blockCountStr, "0x")
         blockCountBig, ok := new(big.Int).SetString(blockCountStr, 16)
         if !ok {
@@ -733,23 +719,4 @@ func parseBlockCount(param json.RawMessage) (uint64, error) {
         blockCount = blockCountBig.Uint64()
     }
     return blockCount, nil
-}
-
-func parseNewestBlock(param json.RawMessage) (string, error) {
-    var newestBlock string
-    if err := json.Unmarshal(param, &newestBlock); err != nil {
-        return "", fmt.Errorf("invalid newestBlock: %v", err)
-    }
-    return newestBlock, nil
-}
-
-func parseRewardPercentiles(params []json.RawMessage) ([]float64, error) {
-    if len(params) <= 2 {
-        return nil, nil
-    }
-    var rewardPercentiles []float64
-    if err := json.Unmarshal(params[2], &rewardPercentiles); err != nil {
-        return nil, fmt.Errorf("invalid rewardPercentiles: %v", err)
-    }
-    return rewardPercentiles, nil
 }
