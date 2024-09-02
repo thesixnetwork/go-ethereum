@@ -1,0 +1,37 @@
+##################### JSON-RPC Message #####################
+[ETHERMINT DAEMON] Version: 2.0
+[ETHERMINT DAEMON] Method: eth_feeHistory
+[ETHERMINT DAEMON] ID: 1
+[ETHERMINT DAEMON] Params:
+[ETHERMINT DAEMON] [
+[ETHERMINT DAEMON]   "0xa",
+[ETHERMINT DAEMON]   "latest",
+[ETHERMINT DAEMON]   [
+[ETHERMINT DAEMON]     20
+[ETHERMINT DAEMON]   ]
+[ETHERMINT DAEMON] ]
+[ETHERMINT DAEMON] ##########################################################
+3:41PM INF Served eth_feeHistory conn=[::1]:58960 duration=0.200083 err="invalid argument 0: json: cannot unmarshal string into Go value of type uint64" module=geth reqid=1
+
+AFTER GO-EThereum 1.13.5
+
+ERORR
+
+[
+  "0xa",
+  "latest",
+  [
+    20
+  ]
+]
+
+PASS
+
+[
+    4,
+    "latest",
+    [
+      25,
+      75
+    ]
+  ]

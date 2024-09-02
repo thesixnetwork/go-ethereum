@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
@@ -492,61 +493,68 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 
 // handleCall processes method calls.
 func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
-    // Log the incoming message details
-    fmt.Println("##################### handleCall Input #####################")
-    fmt.Printf("Method: %s\n", msg.Method)
-    fmt.Printf("ID: %v\n", msg.ID)
-    fmt.Printf("Params: %v\n", msg.Params)
-    fmt.Println("##########################################################")
+	// Log the incoming message details
+	fmt.Println("##################### handleCall Input #####################")
+	fmt.Printf("Method: %s\n", msg.Method)
+	fmt.Printf("ID: %v\n", msg.ID)
+	fmt.Printf("Params: %v\n", msg.Params)
+	fmt.Println("##########################################################")
+
+
+	if msg.Method == "eth_feeHistory" {
+        if err := handleEthFeeHistoryParams(msg); err != nil {
+            return msg.errorResponse(&invalidParamsError{err.Error()})
+        }
+    }
 
 	logJSONRPCMessage(msg)
 
-    if msg.isSubscribe() {
-        return h.handleSubscribe(cp, msg)
-    }
-    var callb *callback
-    if msg.isUnsubscribe() {
-        callb = h.unsubscribeCb
-    } else {
-        callb = h.reg.callback(msg.Method)
-    }
-    if callb == nil {
-        return msg.errorResponse(&methodNotFoundError{method: msg.Method})
-    }
+	if msg.isSubscribe() {
+		return h.handleSubscribe(cp, msg)
+	}
+	var callb *callback
+	if msg.isUnsubscribe() {
+		callb = h.unsubscribeCb
+	} else {
+		callb = h.reg.callback(msg.Method)
+	}
+	if callb == nil {
+		return msg.errorResponse(&methodNotFoundError{method: msg.Method})
+	}
 
-    args, err := parsePositionalArguments(msg.Params, callb.argTypes)
-    if err != nil {
-        return msg.errorResponse(&invalidParamsError{err.Error()})
-    }
+	args, err := parsePositionalArguments(msg.Params, callb.argTypes)
+	if err != nil {
+		return msg.errorResponse(&invalidParamsError{err.Error()})
+	}
 
-    // Log the parsed arguments
-    fmt.Println("##################### Parsed Arguments ####################")
-    fmt.Printf("Args: %v\n", args)
-    fmt.Println("##########################################################")
+	// Log the parsed arguments
+	fmt.Println("##################### Parsed Arguments ####################")
+	fmt.Printf("Args: %v\n", args)
+	fmt.Println("##########################################################")
 
-    start := time.Now()
-    answer := h.runMethod(cp.ctx, msg, callb, args)
+	start := time.Now()
+	answer := h.runMethod(cp.ctx, msg, callb, args)
 
-    // Collect the statistics for RPC calls if metrics is enabled.
-    // We only care about pure rpc call. Filter out subscription.
-    if callb != h.unsubscribeCb {
-        rpcRequestGauge.Inc(1)
-        if answer.Error != nil {
-            failedRequestGauge.Inc(1)
-        } else {
-            successfulRequestGauge.Inc(1)
-        }
-        rpcServingTimer.UpdateSince(start)
-        updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
-    }
+	// Collect the statistics for RPC calls if metrics is enabled.
+	// We only care about pure rpc call. Filter out subscription.
+	if callb != h.unsubscribeCb {
+		rpcRequestGauge.Inc(1)
+		if answer.Error != nil {
+			failedRequestGauge.Inc(1)
+		} else {
+			successfulRequestGauge.Inc(1)
+		}
+		rpcServingTimer.UpdateSince(start)
+		updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
+	}
 
-    // Log the response
-    fmt.Println("##################### handleCall Response #################")
-    fmt.Printf("Error: %v\n", answer.Error)
-    fmt.Printf("Result: %v\n", answer.Result)
-    fmt.Println("##########################################################")
+	// Log the response
+	fmt.Println("##################### handleCall Response #################")
+	fmt.Printf("Error: %v\n", answer.Error)
+	fmt.Printf("Result: %v\n", answer.Result)
+	fmt.Println("##########################################################")
 
-    return answer
+	return answer
 }
 
 // handleSubscribe processes *_subscribe method calls.
@@ -614,51 +622,134 @@ func (id idForLog) String() string {
 	return string(id.RawMessage)
 }
 
-
 func logJSONRPCMessage(msg *jsonrpcMessage) {
-    fmt.Printf("##################### JSON-RPC Message #####################\n")
-    fmt.Printf("Version: %s\n", msg.Version)
-    fmt.Printf("Method: %s\n", msg.Method)
+	fmt.Printf("##################### JSON-RPC Message #####################\n")
+	fmt.Printf("Version: %s\n", msg.Version)
+	fmt.Printf("Method: %s\n", msg.Method)
 
-    // Log ID
-    if len(msg.ID) > 0 {
-        var id interface{}
-        if err := json.Unmarshal(msg.ID, &id); err == nil {
-            fmt.Printf("ID: %v\n", id)
-        } else {
-            fmt.Printf("ID (raw): %s\n", string(msg.ID))
-        }
+	// Log ID
+	if len(msg.ID) > 0 {
+		var id interface{}
+		if err := json.Unmarshal(msg.ID, &id); err == nil {
+			fmt.Printf("ID: %v\n", id)
+		} else {
+			fmt.Printf("ID (raw): %s\n", string(msg.ID))
+		}
+	}
+
+	// Log Params
+	if len(msg.Params) > 0 {
+		var params interface{}
+		if err := json.Unmarshal(msg.Params, &params); err == nil {
+			prettyParams, _ := json.MarshalIndent(params, "", "  ")
+			fmt.Printf("Params:\n%s\n", string(prettyParams))
+		} else {
+			fmt.Printf("Params (raw): %s\n", string(msg.Params))
+		}
+	}
+
+	// Log Error
+	if msg.Error != nil {
+		fmt.Printf("Error: Code=%d, Message=%s\n", msg.Error.Code, msg.Error.Message)
+		if msg.Error.Data != nil {
+			fmt.Printf("Error Data: %v\n", msg.Error.Data)
+		}
+	}
+
+	// Log Result
+	if len(msg.Result) > 0 {
+		var result interface{}
+		if err := json.Unmarshal(msg.Result, &result); err == nil {
+			prettyResult, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Printf("Result:\n%s\n", string(prettyResult))
+		} else {
+			fmt.Printf("Result (raw): %s\n", string(msg.Result))
+		}
+	}
+
+	fmt.Printf("##########################################################\n")
+}
+
+func handleEthFeeHistoryParams(msg *jsonrpcMessage) error {
+    var rawParams []json.RawMessage
+    if err := json.Unmarshal(msg.Params, &rawParams); err != nil {
+        return fmt.Errorf("invalid params: %v", err)
     }
 
-    // Log Params
-    if len(msg.Params) > 0 {
-        var params interface{}
-        if err := json.Unmarshal(msg.Params, &params); err == nil {
-            prettyParams, _ := json.MarshalIndent(params, "", "  ")
-            fmt.Printf("Params:\n%s\n", string(prettyParams))
-        } else {
-            fmt.Printf("Params (raw): %s\n", string(msg.Params))
-        }
+    if len(rawParams) < 2 {
+        return fmt.Errorf("insufficient parameters")
     }
 
-    // Log Error
-    if msg.Error != nil {
-        fmt.Printf("Error: Code=%d, Message=%s\n", msg.Error.Code, msg.Error.Message)
-        if msg.Error.Data != nil {
-            fmt.Printf("Error Data: %v\n", msg.Error.Data)
-        }
+    // Parse and validate parameters
+    blockCount, err := parseBlockCount(rawParams[0])
+    if err != nil {
+        return err
     }
 
-    // Log Result
-    if len(msg.Result) > 0 {
-        var result interface{}
-        if err := json.Unmarshal(msg.Result, &result); err == nil {
-            prettyResult, _ := json.MarshalIndent(result, "", "  ")
-            fmt.Printf("Result:\n%s\n", string(prettyResult))
-        } else {
-            fmt.Printf("Result (raw): %s\n", string(msg.Result))
-        }
+    newestBlock, err := parseNewestBlock(rawParams[1])
+    if err != nil {
+        return err
     }
 
-    fmt.Printf("##########################################################\n")
+    rewardPercentiles, err := parseRewardPercentiles(rawParams)
+    if err != nil {
+        return err
+    }
+
+    // Create a new Params structure with the parsed values
+    newParams := struct {
+        BlockCount        uint64    `json:"blockCount"`
+        NewestBlock       string    `json:"newestBlock"`
+        RewardPercentiles []float64 `json:"rewardPercentiles,omitempty"`
+    }{
+        BlockCount:        blockCount,
+        NewestBlock:       newestBlock,
+        RewardPercentiles: rewardPercentiles,
+    }
+
+    // Marshal the new params back into the message
+    newParamsJSON, err := json.Marshal(newParams)
+    if err != nil {
+        return fmt.Errorf("error marshaling new params: %v", err)
+    }
+
+    msg.Params = json.RawMessage(newParamsJSON)
+    return nil
+}
+
+func parseBlockCount(param json.RawMessage) (uint64, error) {
+    var blockCount uint64
+    if err := json.Unmarshal(param, &blockCount); err != nil {
+        // Try parsing as string
+        var blockCountStr string
+        if err := json.Unmarshal(param, &blockCountStr); err != nil {
+            return 0, fmt.Errorf("invalid blockCount: %v", err)
+        }
+        blockCountStr = strings.TrimPrefix(blockCountStr, "0x")
+        blockCountBig, ok := new(big.Int).SetString(blockCountStr, 16)
+        if !ok {
+            return 0, fmt.Errorf("invalid blockCount: %s", blockCountStr)
+        }
+        blockCount = blockCountBig.Uint64()
+    }
+    return blockCount, nil
+}
+
+func parseNewestBlock(param json.RawMessage) (string, error) {
+    var newestBlock string
+    if err := json.Unmarshal(param, &newestBlock); err != nil {
+        return "", fmt.Errorf("invalid newestBlock: %v", err)
+    }
+    return newestBlock, nil
+}
+
+func parseRewardPercentiles(params []json.RawMessage) ([]float64, error) {
+    if len(params) <= 2 {
+        return nil, nil
+    }
+    var rewardPercentiles []float64
+    if err := json.Unmarshal(params[2], &rewardPercentiles); err != nil {
+        return nil, fmt.Errorf("invalid rewardPercentiles: %v", err)
+    }
+    return rewardPercentiles, nil
 }
