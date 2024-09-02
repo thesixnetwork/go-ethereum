@@ -493,21 +493,13 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 
 // handleCall processes method calls.
 func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
-	// Log the incoming message details
-	fmt.Println("##################### handleCall Input #####################")
-	fmt.Printf("Method: %s\n", msg.Method)
-	fmt.Printf("ID: %v\n", msg.ID)
-	fmt.Printf("Params: %v\n", msg.Params)
-	fmt.Println("##########################################################")
-
-
 	if msg.Method == "eth_feeHistory" {
         if err := handleEthFeeHistoryParams(msg); err != nil {
             return msg.errorResponse(&invalidParamsError{err.Error()})
         }
     }
 
-	logJSONRPCMessage(msg)
+	// logJSONRPCMessage(msg)
 
 	if msg.isSubscribe() {
 		return h.handleSubscribe(cp, msg)
@@ -527,11 +519,6 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
 		return msg.errorResponse(&invalidParamsError{err.Error()})
 	}
 
-	// Log the parsed arguments
-	fmt.Println("##################### Parsed Arguments ####################")
-	fmt.Printf("Args: %v\n", args)
-	fmt.Println("##########################################################")
-
 	start := time.Now()
 	answer := h.runMethod(cp.ctx, msg, callb, args)
 
@@ -547,12 +534,6 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
 		rpcServingTimer.UpdateSince(start)
 		updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
 	}
-
-	// Log the response
-	fmt.Println("##################### handleCall Response #################")
-	fmt.Printf("Error: %v\n", answer.Error)
-	fmt.Printf("Result: %v\n", answer.Result)
-	fmt.Println("##########################################################")
 
 	return answer
 }
@@ -680,14 +661,21 @@ func handleEthFeeHistoryParams(msg *jsonrpcMessage) error {
         return fmt.Errorf("insufficient parameters")
     }
 
-    // Handle blockCount (first parameter)
-    blockCount, err := parseBlockCount(params[0])
+    // Check if conversion is needed for blockCount
+    var blockCount uint64
+    if err := json.Unmarshal(params[0], &blockCount); err == nil {
+        // If this succeeds, the parameter is already a valid uint64
+        return nil
+    }
+
+    // If we're here, conversion is needed
+    convertedBlockCount, err := parseBlockCount(params[0])
     if err != nil {
         return err
     }
 
     // Replace the first parameter with the parsed uint64 value
-    params[0], err = json.Marshal(blockCount)
+    params[0], err = json.Marshal(convertedBlockCount)
     if err != nil {
         return fmt.Errorf("error marshaling blockCount: %v", err)
     }
@@ -703,20 +691,16 @@ func handleEthFeeHistoryParams(msg *jsonrpcMessage) error {
 }
 
 func parseBlockCount(param json.RawMessage) (uint64, error) {
-    var blockCount uint64
-    if err := json.Unmarshal(param, &blockCount); err != nil {
-        // If unmarshaling to uint64 fails, try parsing as string
-        var blockCountStr string
-        if err := json.Unmarshal(param, &blockCountStr); err != nil {
-            return 0, fmt.Errorf("invalid blockCount: %v", err)
-        }
-        // Remove '0x' prefix if present
-        blockCountStr = strings.TrimPrefix(blockCountStr, "0x")
-        blockCountBig, ok := new(big.Int).SetString(blockCountStr, 16)
-        if !ok {
-            return 0, fmt.Errorf("invalid blockCount: %s", blockCountStr)
-        }
-        blockCount = blockCountBig.Uint64()
+    var blockCountStr string
+    if err := json.Unmarshal(param, &blockCountStr); err != nil {
+        return 0, fmt.Errorf("invalid blockCount: %v", err)
     }
-    return blockCount, nil
+    
+    // Remove '0x' prefix if present
+    blockCountStr = strings.TrimPrefix(blockCountStr, "0x")
+    blockCountBig, ok := new(big.Int).SetString(blockCountStr, 16)
+    if !ok {
+        return 0, fmt.Errorf("invalid blockCount: %s", blockCountStr)
+    }
+    return blockCountBig.Uint64(), nil
 }
