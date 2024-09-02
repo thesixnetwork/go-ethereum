@@ -499,6 +499,8 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
     fmt.Printf("Params: %v\n", msg.Params)
     fmt.Println("##########################################################")
 
+	logJSONRPCMessage(msg)
+
     if msg.isSubscribe() {
         return h.handleSubscribe(cp, msg)
     }
@@ -610,4 +612,53 @@ func (id idForLog) String() string {
 		return s
 	}
 	return string(id.RawMessage)
+}
+
+
+func logJSONRPCMessage(msg *jsonrpcMessage) {
+    fmt.Printf("##################### JSON-RPC Message #####################\n")
+    fmt.Printf("Version: %s\n", msg.Version)
+    fmt.Printf("Method: %s\n", msg.Method)
+
+    // Log ID
+    if len(msg.ID) > 0 {
+        var id interface{}
+        if err := json.Unmarshal(msg.ID, &id); err == nil {
+            fmt.Printf("ID: %v\n", id)
+        } else {
+            fmt.Printf("ID (raw): %s\n", string(msg.ID))
+        }
+    }
+
+    // Log Params
+    if len(msg.Params) > 0 {
+        var params interface{}
+        if err := json.Unmarshal(msg.Params, &params); err == nil {
+            prettyParams, _ := json.MarshalIndent(params, "", "  ")
+            fmt.Printf("Params:\n%s\n", string(prettyParams))
+        } else {
+            fmt.Printf("Params (raw): %s\n", string(msg.Params))
+        }
+    }
+
+    // Log Error
+    if msg.Error != nil {
+        fmt.Printf("Error: Code=%d, Message=%s\n", msg.Error.Code, msg.Error.Message)
+        if msg.Error.Data != nil {
+            fmt.Printf("Error Data: %v\n", msg.Error.Data)
+        }
+    }
+
+    // Log Result
+    if len(msg.Result) > 0 {
+        var result interface{}
+        if err := json.Unmarshal(msg.Result, &result); err == nil {
+            prettyResult, _ := json.MarshalIndent(result, "", "  ")
+            fmt.Printf("Result:\n%s\n", string(prettyResult))
+        } else {
+            fmt.Printf("Result (raw): %s\n", string(msg.Result))
+        }
+    }
+
+    fmt.Printf("##########################################################\n")
 }
