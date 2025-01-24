@@ -38,7 +38,7 @@ import (
 // requires a deterministic gas count based on the input size of the Run method of the
 // contract.
 type PrecompiledContract interface {
-	RequiredGas(input []byte) uint64  // RequiredPrice calculates the contract gas use
+	RequiredGas(input []byte) uint64                                                                                                  // RequiredPrice calculates the contract gas use
 	Run(evm *EVM, sender common.Address, callingContract common.Address, input []byte, value *big.Int, readOnly bool) ([]byte, error) // Run runs the precompiled contract
 }
 
@@ -168,12 +168,12 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 // - the returned bytes,
 // - the _remaining_ gas,
 // - any error that occurred
-func  RunPrecompiledContract(p PrecompiledContract, evm *EVM, sender common.Address, callingContract common.Address, input []byte, suppliedGas uint64, value *big.Int, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func RunPrecompiledContract(p PrecompiledContract, evm *EVM, sender common.Address, callingContract common.Address, input []byte, suppliedGas uint64, value *big.Int, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
+	fmt.Printf("################# suppliedGas: %d, gasCost: %d ####################\n", suppliedGas, gasCost)
 	if suppliedGas < gasCost {
 		return nil, 0, ErrOutOfGas
 	}
-    fmt.Printf("################# suppliedGas: %d, gasCost: %d ####################\n", suppliedGas, gasCost)
 	suppliedGas -= gasCost
 	output, err := p.Run(evm, sender, callingContract, input, value, readOnly)
 	return output, suppliedGas, err
@@ -227,6 +227,7 @@ type sha256hash struct{}
 func (c *sha256hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
 }
+
 func (c *sha256hash) Run(_ *EVM, _ common.Address, _ common.Address, input []byte, _ *big.Int, _ bool) ([]byte, error) {
 	h := sha256.Sum256(input)
 	return h[:], nil
@@ -242,6 +243,7 @@ type ripemd160hash struct{}
 func (c *ripemd160hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Ripemd160PerWordGas + params.Ripemd160BaseGas
 }
+
 func (c *ripemd160hash) Run(_ *EVM, _ common.Address, _ common.Address, input []byte, _ *big.Int, _ bool) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
@@ -258,6 +260,7 @@ type dataCopy struct{}
 func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
+
 func (c *dataCopy) Run(_ *EVM, _ common.Address, _ common.Address, input []byte, _ *big.Int, _ bool) ([]byte, error) {
 	return common.CopyBytes(input), nil
 }
@@ -411,7 +414,7 @@ func (c *bigModExp) Run(_ *EVM, _ common.Address, _ common.Address, input []byte
 		// Modulo 0 is undefined, return zero
 		return common.LeftPadBytes([]byte{}, int(modLen)), nil
 	case base.BitLen() == 1: // a bit length of 1 means it's 1 (or -1).
-		//If base == 1, then we can just return base % mod (if mod >= 1, which it is)
+		// If base == 1, then we can just return base % mod (if mod >= 1, which it is)
 		v = base.Mod(base, mod).Bytes()
 	default:
 		v = base.Exp(base, exp, mod).Bytes()
@@ -1094,7 +1097,7 @@ var (
 )
 
 // Run executes the point evaluation precompile.
-func (b *kzgPointEvaluation) Run(_ *EVM, _ common.Address, _ common.Address, input []byte, _ *big.Int, _ bool) ([]byte, error){
+func (b *kzgPointEvaluation) Run(_ *EVM, _ common.Address, _ common.Address, input []byte, _ *big.Int, _ bool) ([]byte, error) {
 	if len(input) != blobVerifyInputLength {
 		return nil, errBlobVerifyInvalidInputLength
 	}
