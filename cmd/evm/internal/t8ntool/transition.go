@@ -182,7 +182,7 @@ func Transition(ctx *cli.Context) error {
 	if cConf, extraEips, err := tests.GetChainConfig(ctx.String(ForknameFlag.Name)); err != nil {
 		return NewError(ErrorConfig, fmt.Errorf("failed constructing chain configuration: %v", err))
 	} else {
-		chainConfig = cConf
+		chainConfig = cConf 
 		vmConfig.ExtraEips = extraEips
 	}
 	// Set the chain id
