@@ -171,9 +171,9 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 func  RunPrecompiledContract(p PrecompiledContract, evm *EVM, sender common.Address, callingContract common.Address, input []byte, suppliedGas uint64, value *big.Int, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
-    fmt.Printf("################# suppliedGas: %d, gasCost: %d\n ####################", suppliedGas, gasCost)
 		return nil, 0, ErrOutOfGas
 	}
+    fmt.Printf("################# suppliedGas: %d, gasCost: %d ####################\n", suppliedGas, gasCost)
 	suppliedGas -= gasCost
 	output, err := p.Run(evm, sender, callingContract, input, value, readOnly)
 	return output, suppliedGas, err
