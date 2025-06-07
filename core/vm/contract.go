@@ -60,6 +60,8 @@ type Contract struct {
 
 	Gas   uint64
 	value *big.Int
+
+	isPrecompile bool
 }
 
 // NewContract returns a new contract environment for the execution of EVM.
@@ -80,6 +82,29 @@ func NewContract(caller ContractRef, object ContractRef, value *big.Int, gas uin
 	c.value = value
 
 	return c
+}
+
+// NewPrecompile returns a new instance of a precompiled contract environment for the execution of EVM.
+func NewPrecompile(caller, object ContractRef, value *big.Int, gas uint64) *Contract {
+	c := &Contract{
+		CallerAddress: caller.Address(),
+		caller:        caller,
+		self:          object,
+		isPrecompile:  true,
+	}
+
+	// Gas should be a pointer so it can safely be reduced through the run
+	// This pointer will be off the state transition
+	c.Gas = gas
+	// ensures a value is set
+	c.value = value
+
+	return c
+}
+
+// IsPrecompile returns true if the contract is a precompiled contract environment
+func (c Contract) IsPrecompile() bool {
+	return c.isPrecompile
 }
 
 func (c *Contract) validJumpdest(dest *uint256.Int) bool {
