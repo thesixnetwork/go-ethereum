@@ -45,6 +45,8 @@ type ScopeContext struct {
 	Contract *Contract
 }
 
+var _ Interpreter = &EVMInterpreter{}
+
 // MemoryData returns the underlying memory slice. Callers must not modify the contents
 // of the returned data.
 func (ctx *ScopeContext) MemoryData() []byte {

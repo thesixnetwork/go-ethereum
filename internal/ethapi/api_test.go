@@ -3291,7 +3291,13 @@ type precompileContract struct{}
 
 func (p *precompileContract) RequiredGas(input []byte) uint64 { return 0 }
 
-func (p *precompileContract) Run(input []byte) ([]byte, error) { return nil, nil }
+func (c *precompileContract) Run(_ *vm.EVM, _ common.Address, _ common.Address, input []byte, _ *uint256.Int, _ bool) ([]byte, error) {
+	return nil, nil
+}
+
+func (p *precompileContract) Address() common.Address {
+	panic("unimplement")
+}
 
 func TestStateOverrideMovePrecompile(t *testing.T) {
 	db := state.NewDatabase(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil), nil)
@@ -3303,6 +3309,7 @@ func TestStateOverrideMovePrecompile(t *testing.T) {
 		common.BytesToAddress([]byte{0x1}): &precompileContract{},
 		common.BytesToAddress([]byte{0x2}): &precompileContract{},
 	}
+
 	bytes2Addr := func(b []byte) *common.Address {
 		a := common.BytesToAddress(b)
 		return &a
